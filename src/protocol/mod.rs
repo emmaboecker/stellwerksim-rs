@@ -1,5 +1,6 @@
 mod serialization;
 
+mod event;
 mod platform_list;
 #[cfg(feature = "simulator-time")]
 pub(crate) mod simulator_time;
@@ -11,6 +12,7 @@ mod train_list;
 mod train_timetable;
 mod ways;
 
+pub use event::*;
 pub use platform_list::*;
 pub use status::*;
 pub use system_info::*;

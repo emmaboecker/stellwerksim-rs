@@ -1,3 +1,4 @@
+use stellwerksim::protocol::EventType;
 use stellwerksim::Plugin;
 
 #[tokio::main()]
@@ -22,17 +23,35 @@ async fn main() {
     println!("{train_list:#?}");
 
     let train_details = plugin
-        .train_details(&train_list.get(0).unwrap().id)
+        .train_details(&train_list.first().unwrap().id)
         .await
         .unwrap();
     println!("{train_details:#?}");
 
     let train_timetable = plugin
-        .train_timetable(&train_list.get(0).unwrap().id)
+        .train_timetable(&train_list.first().unwrap().id)
         .await
         .unwrap();
     println!("{train_timetable:#?}");
 
     let ways = plugin.ways().await.unwrap();
     println!("{ways:#?}");
+
+    let mut receivers = Vec::new();
+    for train in train_list {
+        let receiver = plugin
+            .subscribe_events(&train.id, EventType::all())
+            .await
+            .unwrap();
+
+        receivers.push(receiver);
+    }
+
+    let handles = receivers.into_iter().map(|mut receiver| {
+        tokio::spawn(async move {
+            println!("received event: {:#?}", receiver.recv().await);
+        })
+    });
+
+    let _ = futures::future::select_all(handles).await;
 }
