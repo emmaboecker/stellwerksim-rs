@@ -44,7 +44,9 @@
     unused_lifetimes
 )]
 
+use std::future::Future;
 use std::net::SocketAddr;
+use std::pin::Pin;
 use std::sync::Arc;
 
 use mpsc::{UnboundedReceiver, UnboundedSender};
@@ -117,14 +119,22 @@ impl Plugin {
             let standby = standby_clone;
             loop {
                 let mut buf = String::new();
+
                 let result: Result<(), Error> = tokio::select! {
-                    _ = stream.read_line(&mut buf) => {
+                    result = stream.read_line(&mut buf) => {
                         let message = buf.trim();
+                        tracing::debug!("Received message: {}", message);
                         if message.starts_with("<ereignis") {
                             let event = serde_xml_rs::from_str::<Event>(message)?;
                             standby.process_event(event)?;
                         } else {
                             stream_sender.send(message.to_owned())?;
+                        }
+                        if result? == 0 {
+                            return Err(Error::Network(tokio::io::Error::new(
+                                tokio::io::ErrorKind::UnexpectedEof,
+                                "Connection closed",
+                            )));
                         }
                         Ok(())
                     }
@@ -132,11 +142,16 @@ impl Plugin {
                         stream.write_all(message.as_bytes()).await?;
                         stream.write_u8(b'\n').await?;
                         stream.flush().await?;
+
+                        tracing::debug!("Sent message: {}", message);
                         Ok(())
                     }
                 };
 
-                result?;
+                if let Err(err) = result {
+                    tracing::error!("error in plugin task: {:?}", err);
+                    return Err(err);
+                }
             }
         });
 
@@ -258,12 +273,6 @@ impl Plugin {
         }
 
         Ok(self.event_standby.receive_events(train_id.to_owned()))
-    }
-}
-
-impl Drop for Plugin {
-    fn drop(&mut self) {
-        self.handle.abort();
     }
 }
 

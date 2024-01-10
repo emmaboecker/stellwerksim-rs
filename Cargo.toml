@@ -23,6 +23,7 @@ chrono = { version = "0.4", features = ["serde"], optional = true }
 serde_with = { version = "2", features = ["chrono"], optional = true }
 dashmap = "5.5"
 serde_variant = "0.1"
+tracing = "0.1"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
